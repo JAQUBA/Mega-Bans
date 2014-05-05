@@ -180,6 +180,7 @@ public cmdKick(id,level,cid) {
 	//return PLUGIN_HANDLED;
 }
 public cmdBan(id,level,cid) {
+	//ahm
 	//return PLUGIN_HANDLED;
 }
 public cmdBanIP(id,level,cid) {
