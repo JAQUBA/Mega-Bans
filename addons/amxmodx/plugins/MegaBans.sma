@@ -61,6 +61,16 @@ public plugin_init() {
 	remove_user_flags(0, read_flags("z"));
 	
 	gMaxPlayers=get_maxplayers();
+	
+	register_concmd("amx_kick", "cmdKick", ADMIN_KICK, "<name or #userid> [reason]");
+	register_concmd("amx_ban", "cmdBan", ADMIN_BAN|ADMIN_BAN_TEMP, "<name or #userid> <minutes> [reason]");
+	register_concmd("amx_banip", "cmdBanIP", ADMIN_BAN|ADMIN_BAN_TEMP, "<name or #userid> <minutes> [reason]");
+	register_concmd("amx_addban", "cmdAddBan", ADMIN_BAN, "<^"authid^" or ip> <minutes> [reason]");
+	register_concmd("amx_unban", "cmdUnban", ADMIN_BAN|ADMIN_BAN_TEMP, "<^"authid^" or ip>");
+	
+	register_clcmd("amx_kickmenu", "cmdKickMenu", ADMIN_KICK, "- displays kick menu");
+	register_clcmd("amx_banmenu", "cmdBanMenu", ADMIN_BAN|ADMIN_BAN_TEMP, "- displays ban menu");
+	
 }
 public plugin_cfg() {
 	new szConfigsDir[65];
@@ -139,7 +149,7 @@ public client_putinserver(id) {
 	get_user_info(id,"_pw",szPassword,charsmax(szPassword));
 	
 	new AdminData[AdminDataStruct];
-	new iFlags,szAuth[33],bool:bSelected;
+	new iFlags,szAuth[33],bool:bSelected=false;
 	for(new a=0;a<ArraySize(aAdmins);++a) {
 		ArrayGetArray(aAdmins,a,AdminData);
 		copy(szAuth,charsmax(szAuth),AdminData[admSzAuth]);
@@ -150,6 +160,9 @@ public client_putinserver(id) {
 		else if(iFlags&FLAG_TAG && iFlags&FLAG_CASE_SENSITIVE?contain(szName,szAuth)!=-1:contain(szName,szAuth)!=1) {bSelected=true;break;}
 		else if(iFlags&FLAG_CASE_SENSITIVE?equal(szName,szAuth):equali(szName,szAuth)) {bSelected=true;break;}
 	}
+	
+	server_print("%d %s %d",iFlags,szAuth,bSelected);
+	
 	if(bSelected) {
 		if(iFlags&FLAG_NOPASS || equal(szPassword,AdminData[admSzPassword])) {
 			set_user_flags(id,AdminData[admIAccess]);
@@ -169,10 +182,27 @@ public client_infochanged(id) {
 	//client_putinserver(id);
 }
 
-
-
-
-
+public cmdKick(id,level,cid) {
+	//return PLUGIN_HANDLED;
+}
+public cmdBan(id,level,cid) {
+	//return PLUGIN_HANDLED;
+}
+public cmdBanIP(id,level,cid) {
+	//return PLUGIN_HANDLED;
+}
+public cmdAddBan(id,level,cid) {
+	//return PLUGIN_HANDLED;
+}
+public cmdUnban(id,level,cid) {
+	//return PLUGIN_HANDLED;
+}
+public cmdKickMenu(id,level,cid) {
+	//return PLUGIN_HANDLED;
+}
+public cmdBanMenu(id,level,cid) {
+	//return PLUGIN_HANDLED;
+}
 
 
 
