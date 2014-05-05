@@ -147,22 +147,17 @@ public client_putinserver(id) {
 	get_user_ip(id,szIP,charsmax(szIP),1);
 	get_user_name(id,szName,charsmax(szName));
 	get_user_info(id,"_pw",szPassword,charsmax(szPassword));
-	
 	new AdminData[AdminDataStruct];
 	new iFlags,szAuth[33],bool:bSelected=false;
 	for(new a=0;a<ArraySize(aAdmins);++a) {
 		ArrayGetArray(aAdmins,a,AdminData);
 		copy(szAuth,charsmax(szAuth),AdminData[admSzAuth]);
 		iFlags=AdminData[admIFlags];
-		
 		if(iFlags&FLAG_AUTHID && equal(szAuthID,szAuth)) {bSelected=true;break;}
 		else if(iFlags&FLAG_IP && equal(szIP,szAuth)) {bSelected=true;break;}
-		else if(iFlags&FLAG_TAG && iFlags&FLAG_CASE_SENSITIVE?contain(szName,szAuth)!=-1:contain(szName,szAuth)!=1) {bSelected=true;break;}
+		else if(iFlags&FLAG_TAG && (iFlags&FLAG_CASE_SENSITIVE?contain(szName,szAuth)!=-1:containi(szName,szAuth)!=-1)) {bSelected=true;break;}
 		else if(iFlags&FLAG_CASE_SENSITIVE?equal(szName,szAuth):equali(szName,szAuth)) {bSelected=true;break;}
 	}
-	
-	server_print("%d %s %d",iFlags,szAuth,bSelected);
-	
 	if(bSelected) {
 		if(iFlags&FLAG_NOPASS || equal(szPassword,AdminData[admSzPassword])) {
 			set_user_flags(id,AdminData[admIAccess]);
@@ -170,7 +165,6 @@ public client_putinserver(id) {
 			new szAccess[23];
 			get_flags(AdminData[admIAccess],szAccess,charsmax(szAccess));
 			log_amx("^"%s^" <%s><%s> became an admin (access ^"%s^")",szName,szAuthID,szIP,szAccess);
-			
 		} else if(iFlags&FLAG_KICK) {
 			log_amx("^"%s^" <%s><%s> kicked due to invalid password",szName,szAuthID,szIP);
 			server_cmd("kick #%d ^"%L^"", get_user_userid(id), id, "NO_ENTRY");
