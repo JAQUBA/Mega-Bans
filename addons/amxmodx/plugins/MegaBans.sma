@@ -26,14 +26,16 @@ enum _:GlobalStruct {
 	gTimeOffset
 }
 enum _:AdminDataStruct {
+	admSzAuth[33],
+	admSzPassword[33],
 	admIAccess,
-	admSzPassword[33]
+	admIFlags
 }
 
 new Cvar[CvarStruct];
 new Global[GlobalStruct];
 
-new Trie:tAdmins;
+new Array:aAdmins;
 
 public plugin_init() {
 	register_plugin("Mega Bans",VERSION,"JAQUBA");
@@ -50,7 +52,12 @@ public plugin_init() {
 	
 	get_user_ip(0,Global[gSzServerIP],charsmax(Global[gSzServerIP]));
 	
-	tAdmins=TrieCreate();
+	aAdmins=ArrayCreate(AdminDataStruct);
+	
+	register_dictionary("admin.txt");
+	
+	//register_concmd("amx_reloadadmins", "cmdReload", ADMIN_CFG);
+	//remove_user_flags(0, read_flags("z"))		// Remove 'user' flag from server rights
 }
 public plugin_cfg() {
 	new szConfigsDir[65];
@@ -83,7 +90,7 @@ public GetServerID_handler(Handle:Query) {
 	new iResults=MySql_ResultsNum(Query);
 	if(iResults) {
 		Global[gServerID]=MySql_ReadResultNum(Query,"id");
-		MySql_QueryAndIgnore("UPDATE `%s_servers` SET `version` = '%s' WHERE `id` = %d;",Global[gSzPrefix],VERSION,Global[gServerID]);
+		MySql_QueryAndIgnore("UPDATE `%s_servers` SET `version` = '%s', `last_seen` = '%d' WHERE `id` = %d;",Global[gSzPrefix],VERSION,get_systime(Global[gTimeOffset]),Global[gServerID]);
 	} else {
 		MySql_QueryAndIgnore("INSERT INTO `%s_servers` (`ip`, `version`) VALUES ('%s', '%s');",Global[gSzPrefix],Global[gSzServerIP],VERSION);
 		GetServerID();
@@ -92,54 +99,62 @@ public GetServerID_handler(Handle:Query) {
 	LoadAdmins();
 }
 LoadAdmins() {
-	MySql_Query2("LoadAdmins_handler",_,_,"SELECT `admin`.`auth`, `level`.`access` FROM `%s_admins` AS `admin`, `%s_levels` AS `level`, `%s_server_admins` AS `server` WHERE `admin`.`id`=`server`.`admin` AND `level`.`id`=`server`.`level` AND `server`.`server`='%d';",Global[gSzPrefix],Global[gSzPrefix],Global[gSzPrefix],Global[gServerID]);
+	MySql_Query2("LoadAdmins_handler",_,_,"SELECT `admin`.`auth`, `admin`.`password`,`admin`.`flags`, `level`.`access` FROM `%s_admins` AS `admin`, `%s_levels` AS `level`, `%s_server_admins` AS `server` WHERE `admin`.`id`=`server`.`admin` AND `level`.`id`=`server`.`level` AND `server`.`server`='%d';",Global[gSzPrefix],Global[gSzPrefix],Global[gSzPrefix],Global[gServerID]);
 }
 public LoadAdmins_handler(Handle:Query) {
 	
-	new szAuth[33],AdminData[AdminDataStruct],szAccess[23];
+	new AdminData[AdminDataStruct];
+	new szAccess[23];
+	new szFlags[5];
 	
 	for(;MySql_MoreResults(Query);SQL_NextRow(Query)) {
-		MySql_ReadResultString(Query,"auth",szAuth,charsmax(szAuth));
-		
+		MySql_ReadResultString(Query,"auth",AdminData[admSzAuth],charsmax(AdminData[admSzAuth]));
+		MySql_ReadResultString(Query,"password",AdminData[admSzPassword],charsmax(AdminData[admSzPassword]));
 		MySql_ReadResultString(Query,"access",szAccess,charsmax(szAccess));
-		
-		//MySql_ReadResultString(Query,"password",AdminData[admSzPassword],charsmax(AdminData[admSzPassword]));
+		MySql_ReadResultString(Query,"flags",szFlags,charsmax(szFlags));
 		
 		AdminData[admIAccess]=read_flags(szAccess);
+		AdminData[admIFlags]=read_flags(szFlags);
 		
-		TrieSetArray(tAdmins,szAuth,AdminData,sizeof(AdminData));
+		ArrayPushArray(aAdmins,AdminData);
 	}
-}
-public client_authorized(id) {
-	new szAuthID[33],szIP[23],szName[33];
-	get_user_authid(id,szAuthID,charsmax(szAuthID));
-	get_user_ip(id,szIP,charsmax(szIP),1);
-	get_user_name(id,szName,charsmax(szName));
 	
-	
+	server_print("%L",LANG_SERVER,"SQL_LOADED_ADMINS",ArraySize(aAdmins));
 }
 public client_putinserver(id) {
-	new szAuthID[33],szIP[23],szName[33];
+	remove_user_flags(id);
+	new szAuthID[33],szIP[23],szName[33],szPassword[33];
 	get_user_authid(id,szAuthID,charsmax(szAuthID));
 	get_user_ip(id,szIP,charsmax(szIP),1);
 	get_user_name(id,szName,charsmax(szName));
+	get_user_info(id,"_pw",szPassword,charsmax(szPassword));
 	
 	new AdminData[AdminDataStruct];
-	
-	if(
-	TrieKeyExists(tAdmins,szAuthID)) {
-		TrieGetArray(tAdmins,szAuthID,AdminData,sizeof(AdminData));
-	} else if(
-	TrieKeyExists(tAdmins,szIP)) {
-		TrieGetArray(tAdmins,szIP,AdminData,sizeof(AdminData));
-	} else if(
-	TrieKeyExists(tAdmins,szName)) {
-		TrieGetArray(tAdmins,szName,AdminData,sizeof(AdminData));
-	} else return;
-	
-	//if(1=1)
-	
-	set_user_flags(id,AdminData[admIAccess]);
+	new iFlags,szAuth[33];
+	for(new a=0;a<ArraySize(aAdmins);++a) {
+		ArrayGetArray(aAdmins,a,AdminData);
+		szAuth=AdminData[admSzAuth];
+		iFlags=AdminData[admIFlags];
+		
+		if(iFlags&FLAG_AUTHID && equal(szAuthID,szAuth)) break;
+		else if(iFlags&FLAG_IP && equal(szIP,szAuth)) break;
+		else if(iFlags&FLAG_TAG && iFlags&FLAG_CASE_SENSITIVE?contain(szName,szAuth)!=-1:contain(szName,szAuth)!=1) break;
+		else if(iFlags&FLAG_CASE_SENSITIVE?equal(szName,szAuth):equali(szName,szAuth)) break;
+		else return;
+	}
+	if(iFlags&FLAG_NOPASS || equal(szPassword,AdminData[admSzPassword])) {
+		set_user_flags(id,AdminData[admIAccess]);
+		client_print(id,print_console,"%L",LANG_PLAYER,"PRIV_SET");
+		//log_amx("[UBans] Login: ^"%s^" <%s><%s> became an admin (account ^"%s^") (access ^"%s^")");
+		
+	} else if(iFlags&FLAG_KICK) {
+		//log_amx("[UBans] Login: ^"%s^" <%s><%s> kicked due to invalid password (account ^"%s^")", name, authid, ip, AuthData);
+		//client_cmd(id,"echo * bad password(for admin)");
+		//server_cmd("kick #%d ^"%L^"", get_user_userid(id), id, "NO_ENTRY")
+		client_print(id,print_console,"%L",LANG_PLAYER,"INV_PAS");
+		//kick
+		
+	} else set_user_flags(id,read_flags("z"));
 }
 
 
