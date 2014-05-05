@@ -56,8 +56,8 @@ public plugin_init() {
 	
 	register_dictionary("admin.txt");
 	
-	//register_concmd("amx_reloadadmins", "cmdReload", ADMIN_CFG);
-	//remove_user_flags(0, read_flags("z"))		// Remove 'user' flag from server rights
+	register_concmd("amx_reloadadmins", "cmdReload", ADMIN_CFG);
+	remove_user_flags(0, read_flags("z"));
 }
 public plugin_cfg() {
 	new szConfigsDir[65];
@@ -98,6 +98,11 @@ public GetServerID_handler(Handle:Query) {
 	}
 	LoadAdmins();
 }
+public cmdReload() {
+	ArrayClear(aAdmins);
+	LoadAdmins();
+}
+
 LoadAdmins() {
 	MySql_Query2("LoadAdmins_handler",_,_,"SELECT `admin`.`auth`, `admin`.`password`,`admin`.`flags`, `level`.`access` FROM `%s_admins` AS `admin`, `%s_levels` AS `level`, `%s_server_admins` AS `server` WHERE `admin`.`id`=`server`.`admin` AND `level`.`id`=`server`.`level` AND `server`.`server`='%d';",Global[gSzPrefix],Global[gSzPrefix],Global[gSzPrefix],Global[gServerID]);
 }
@@ -130,22 +135,25 @@ public client_putinserver(id) {
 	get_user_info(id,"_pw",szPassword,charsmax(szPassword));
 	
 	new AdminData[AdminDataStruct];
-	new iFlags,szAuth[33];
+	new iFlags,szAuth[33],bool:bSelected;
 	for(new a=0;a<ArraySize(aAdmins);++a) {
 		ArrayGetArray(aAdmins,a,AdminData);
 		szAuth=AdminData[admSzAuth];
 		iFlags=AdminData[admIFlags];
 		
-		if(iFlags&FLAG_AUTHID && equal(szAuthID,szAuth)) break;
-		else if(iFlags&FLAG_IP && equal(szIP,szAuth)) break;
-		else if(iFlags&FLAG_TAG && iFlags&FLAG_CASE_SENSITIVE?contain(szName,szAuth)!=-1:contain(szName,szAuth)!=1) break;
-		else if(iFlags&FLAG_CASE_SENSITIVE?equal(szName,szAuth):equali(szName,szAuth)) break;
-		else return;
+		if(iFlags&FLAG_AUTHID && equal(szAuthID,szAuth)) {bSelected=true;break;}
+		else if(iFlags&FLAG_IP && equal(szIP,szAuth)) {bSelected=true;break;}
+		else if(iFlags&FLAG_TAG && iFlags&FLAG_CASE_SENSITIVE?contain(szName,szAuth)!=-1:contain(szName,szAuth)!=1) {bSelected=true;break;}
+		else if(iFlags&FLAG_CASE_SENSITIVE?equal(szName,szAuth):equali(szName,szAuth)) {bSelected=true;break;}
+	}
+	if(!bSelected) {
+		set_user_flags(id,read_flags("z"));
+		return;
 	}
 	if(iFlags&FLAG_NOPASS || equal(szPassword,AdminData[admSzPassword])) {
 		set_user_flags(id,AdminData[admIAccess]);
 		client_print(id,print_console,"%L",LANG_PLAYER,"PRIV_SET");
-		//log_amx("[UBans] Login: ^"%s^" <%s><%s> became an admin (account ^"%s^") (access ^"%s^")");
+		log_amx("[MegaBans] Login: ^"%s^" <%s><%s> became an admin (access ^"%s^")",szName,szAuthID,szIP,szAuth);
 		
 	} else if(iFlags&FLAG_KICK) {
 		//log_amx("[UBans] Login: ^"%s^" <%s><%s> kicked due to invalid password (account ^"%s^")", name, authid, ip, AuthData);
@@ -153,8 +161,7 @@ public client_putinserver(id) {
 		//server_cmd("kick #%d ^"%L^"", get_user_userid(id), id, "NO_ENTRY")
 		client_print(id,print_console,"%L",LANG_PLAYER,"INV_PAS");
 		//kick
-		
-	} else set_user_flags(id,read_flags("z"));
+	}
 }
 
 
